@@ -1,6 +1,6 @@
 # Real-Time Sleep Stage Prediction with LSTM
 
-This project implements a modular system in Python for real-time sleep stage prediction using EEG data. The core idea is to predict a person's sleep stage at a future point in time, allowing for a configurable "gap" between the last available data and the prediction target.
+This project implements a modular system in Python for real-time sleep stage prediction using EEG data. The core idea is to predict a person's sleep stage at a future point in time, allowing for a configurable "gap" between the last available data and the prediction target. This code is designed to be used into Google Colab.
 
 The system uses a dual-model approach:
 1.  **LSTM (Long Short-Term Memory) Network**: To analyze sequences of past sleep epochs and predict a future sleep stage. This is ideal for capturing temporal dependencies in sleep patterns.
@@ -35,7 +35,7 @@ This work is a practical implementation and continuation of the concepts present
 The project is organized into the following Python scripts:
 
 -   `config.py`: A central file for all global parameters.
--   `data_loader.py`: Handles the automatic download and loading of data using MNE-Python.
+-   `data_loader.py`: Handles the automatic download and loading of data using MNE-Python. 
 -   `feature_extractor.py`: Calculates Power Spectral Density (PSD) features.
 -   `models.py`: Defines the Keras LSTM and Scikit-learn Random Forest models.
 -   `train.py`: Orchestrates the training pipeline.

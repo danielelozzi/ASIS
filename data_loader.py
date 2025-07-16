@@ -6,24 +6,52 @@ import mne
 from mne.datasets.sleep_physionet.age import fetch_data
 from config import EEG_CHANNELS, EPOCH_DURATION, LABEL_MAP, FS
 
+def _setup_mne_data_on_drive():
+    """
+    Funzione ausiliaria per montare Google Drive e impostare la directory dei dati di MNE.
+    Viene eseguita solo se lo script rileva di essere in un ambiente Google Colab.
+    """
+    try:
+        # Questo import funziona solo su Colab
+        from google.colab import drive
+        
+        print("Ambiente Colab rilevato. Tentativo di montare Google Drive...")
+        drive.mount('/content/drive', force_remount=True)
+        
+        # Percorso della cartella dei dati su Google Drive
+        gdrive_mne_path = '/content/drive/MyDrive/mne_data'
+        print(f"Il percorso per i dati MNE sarà: {gdrive_mne_path}")
+        
+        if not os.path.exists(gdrive_mne_path):
+            os.makedirs(gdrive_mne_path)
+            print(f"Directory creata.")
+        else:
+            print(f"La directory esiste già.")
+            
+        # Imposta la configurazione di MNE per usare la cartella su Drive
+        mne.set_config('MNE_DATA', gdrive_mne_path, set_env=True)
+        print(f"MNE è stato configurato per usare la directory su Google Drive.")
+
+    except ImportError:
+        # Se l'import di google.colab fallisce, significa che non siamo su Colab
+        print("Ambiente non Colab rilevato. Si utilizzerà la directory predefinita di MNE.")
+    except Exception as e:
+        print(f"Si è verificato un errore durante il setup di Google Drive: {e}")
+
+
 def fetch_physionet_subjects(subjects, recording=[1]):
     """
-    Scarica i dati per i soggetti specificati usando MNE e restituisce i percorsi dei file.
-
-    Args:
-        subjects (list): Una lista di interi che rappresentano i numeri dei soggetti da scaricare (es. [0, 1, 2]).
-        recording (list): Una lista di interi che rappresentano le registrazioni da scaricare (di solito [1]).
-
-    Returns:
-        list: Una lista di tuple, dove ogni tupla contiene il percorso del file PSG e del file di annotazione.
+    Scarica i dati per i soggetti specificati usando MNE.
+    Prima controlla e imposta la directory dei dati su Google Drive se in ambiente Colab.
     """
-    print(f"Download dei dati per i soggetti: {subjects}...")
-    # Scarica i dati (se non già presenti) e ottiene i percorsi
+    # Esegue il setup di Google Drive all'inizio
+    _setup_mne_data_on_drive()
+
+    print(f"\nDownload (o caricamento dalla cache) dei dati per i soggetti: {subjects}...")
+    # MNE userà automaticamente il percorso impostato da _setup_mne_data_on_drive
     paths = fetch_data(subjects=subjects, recording=recording, on_missing='warn')
-    print("Download completato.")
+    print("Operazione completata.")
     
-    # fetch_data restituisce una lista di liste [[psg1, hyp1], [psg2, hyp2]]. 
-    # La convertiamo in una lista di tuple per coerenza.
     subject_files = [(path[0], path[1]) for path in paths]
     return subject_files
 
@@ -32,9 +60,7 @@ def load_sleep_data(edf_path, annotation_path):
     Carica i dati grezzi EEG e le etichette degli stadi del sonno da un singolo soggetto.
     """
     try:
-        # Usa mne.io.read_raw che è più generico e non si basa sull'estensione del file
         raw = mne.io.read_raw(edf_path, preload=True, stim_channel=None)
-        # MNE riconosce automaticamente il formato .hyp per le annotazioni
         annot = mne.read_annotations(annotation_path)
         raw.set_annotations(annot, emit_warning=False)
         
@@ -74,7 +100,6 @@ if __name__ == '__main__':
     if not all_files:
         print("Nessun file scaricato o trovato.")
     else:
-        # Carica i dati per il primo soggetto come esempio
         first_subject_psg, first_subject_annot = all_files[0]
         print(f"\nTentativo di caricare i dati per il soggetto: {os.path.basename(first_subject_psg)}")
         
