@@ -26,28 +26,28 @@ This work is a practical implementation and continuation of the concepts present
 ## Features
 
 - **Modular Design**: The code is split into logical modules for configuration, data loading, feature extraction, modeling, training, and prediction.
-- **Configurable Prediction Gap**: Easily adjust how far into the future the model predicts (e.g., predict the sleep stage 30, 60, or 90 minutes from now).
-- **Subject-Dependent Fine-Tuning (Concept)**: The structure is designed to be extendable for fine-tuning the general model on a specific subject's data.
+- **Automatic Data Fetching**: Uses the `mne` library to automatically download and cache the PhysioNet Sleep-EDF dataset, simplifying setup.
+- **Configurable Prediction Gap**: Easily adjust how far into the future the model predicts.
 - **Real-Time Simulation**: The `predict.py` script simulates how the system would operate overnight, making periodic predictions.
-- **Standard Dataset**: Uses the well-known [PhysioNet Sleep EDFx Expanded Database](https://www.physionet.org/content/sleep-edfx/1.0.0/).
 
 ## Project Structure
 
 The project is organized into the following Python scripts:
 
--   `config.py`: A central file for all global parameters, such as EEG frequency bands, model hyperparameters, and label mappings.
--   `data_loader.py`: Handles the loading and parsing of EDF files from the PhysioNet dataset. It segments the data into 30-second epochs.
--   `feature_extractor.py`: Calculates the Power Spectral Density (PSD) for different frequency bands from the raw EEG signals.
--   `models.py`: Defines the Keras LSTM model and the Scikit-learn Random Forest classifier.
--   `train.py`: Orchestrates the training pipeline. It loads data from all subjects, extracts features, and trains both the general LSTM and Random Forest models.
--   `predict.py`: Loads the pre-trained models to run a prediction simulation on a single subject's data, demonstrating the system's capabilities.
+-   `config.py`: A central file for all global parameters.
+-   `data_loader.py`: Handles the automatic download and loading of data using MNE-Python.
+-   `feature_extractor.py`: Calculates Power Spectral Density (PSD) features.
+-   `models.py`: Defines the Keras LSTM and Scikit-learn Random Forest models.
+-   `train.py`: Orchestrates the training pipeline.
+-   `predict.py`: Loads pre-trained models to run a prediction simulation.
+-   `requirements.txt`: Lists all necessary Python packages.
 
 ## Installation
 
 1.  **Clone the repository:**
     ```bash
-    git clone http://github.com/danielelozzi/ASIS
-    cd ASIS
+    git clone <your-repository-url>
+    cd <your-repository-name>
     ```
 
 2.  **Install the required dependencies:**
@@ -55,14 +55,7 @@ The project is organized into the following Python scripts:
     ```bash
     pip install -r requirements.txt
     ```
-    If a `requirements.txt` is not available, install the main packages manually:
-    ```bash
-    pip install tensorflow scikit-learn mne numpy joblib
-    ```
-
-3.  **Download the Dataset:**
-    - Download the **Sleep EDFx Expanded** dataset from [PhysioNet](https://www.physionet.org/content/sleep-edfx/1.0.0/).
-    - Extract the `sleep-cassette` folder into the root of the project directory, or update the `DATASET_PATH` variable in the `train.py` and `predict.py` scripts to point to its location.
+    **Note:** The dataset will be downloaded automatically by the `data_loader.py` script on the first run. You no longer need to download it manually.
 
 ## How to Use
 
@@ -70,19 +63,20 @@ The process is divided into two main steps: training and prediction.
 
 ### 1. Train the Models
 
-First, you need to train the models on the entire dataset. This will create a `models/` directory containing the trained LSTM model (`.h5`), the Random Forest model (`.pkl`), and the data scaler (`.pkl`).
+First, you need to train the models. The `train.py` script is configured to use a specific number of subjects from the dataset for training. On the first run, MNE will download the necessary data, which may take some time.
 
 ```bash
 python train.py
 ```
-This process may take some time depending on your hardware and the size of the dataset.
+
+This will create a `models/` directory containing the trained LSTM model (`.h5`), the Random Forest model (`.pkl`), and the data scaler (`.pkl`). You can change the number of subjects to train on by editing the `subjects_to_train_on` list at the bottom of `train.py`.
 
 ### 2. Run a Prediction Simulation
 
-Once the models are trained and saved, you can run a simulation to see the prediction system in action. The script will pick a subject from the dataset and output real-time predictions for future sleep stages.
+Once the models are trained and saved, you can run a simulation to see the prediction system in action. The `predict.py` script will download the data for a specific subject (if not already cached) and output real-time predictions for future sleep stages.
 
 ```bash
 python predict.py
 ```
 
-You can customize the simulation by editing the parameters in the `if __name__ == '__main__':` block of `predict.py`, such as `prediction_gap_minutes` and `update_interval_minutes`.
+You can customize the simulation by editing the parameters in `predict.py`, such as the subject ID, `prediction_gap_minutes`, and `update_interval_minutes`.

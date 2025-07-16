@@ -24,61 +24,58 @@ from config import (
 def prepare_sequences(features, labels, look_back, gap):
     """
     Trasforma i dati di feature e etichette in sequenze per l'LSTM.
-
-    Args:
-        features (np.ndarray): Array 2D di feature (n_epochs, n_features).
-        labels (np.ndarray): Array 1D di etichette (n_epochs,).
-        look_back (int): Numero di epoche passate da usare come input.
-        gap (int): Il numero di epoche tra l'ultimo dato di input e il target.
-
-    Returns:
-        tuple: (X, y) dove X è l'array di sequenze e y l'array di etichette target.
     """
     X, y = [], []
     n_epochs = len(features)
     for i in range(n_epochs - look_back - gap):
-        # La sequenza di input va da i a i+look_back
         sequence = features[i:i + look_back]
-        # L'etichetta target è quella all'istante i+look_back+gap
         target_label = labels[i + look_back + gap]
         X.append(sequence)
         y.append(target_label)
     return np.array(X), np.array(y)
 
-def train_general_model(dataset_path, models_output_dir='models'):
+def train_general_model(subjects_to_load, models_output_dir='models'):
     """
-    Addestra un modello generale usando i dati di tutti i soggetti.
+    Addestra un modello generale usando i dati dei soggetti specificati.
 
     Args:
-        dataset_path (str): Percorso della directory del dataset.
+        subjects_to_load (list): Lista di interi dei soggetti da scaricare e usare.
         models_output_dir (str): Directory dove salvare i modelli addestrati.
     """
     print("--- Inizio Addestramento Modello Generale ---")
     
-    # 1. Carica e processa i dati di tutti i soggetti
-    all_files = data_loader.get_subject_files(dataset_path)
+    # 1. Scarica e processa i dati per i soggetti specificati
+    all_files = data_loader.fetch_physionet_subjects(subjects=subjects_to_load)
+    
+    if not all_files:
+        print("\nERRORE CRITICO: Nessun file di dati scaricato o trovato.")
+        return
+
     all_features = []
     all_labels = []
 
     for psg_path, annot_path in all_files:
         data, labels = data_loader.load_sleep_data(psg_path, annot_path)
-        if data is not None:
+        if data is not None and labels is not None:
             features = feature_extractor.extract_psd_features(data)
             all_features.append(features)
             all_labels.append(labels)
-    
+        else:
+            print(f"Attenzione: Fallito il caricamento dei dati per {os.path.basename(psg_path)}. File saltato.")
+            
+    if not all_features:
+        print("\nERRORE CRITICO: Non è stato possibile estrarre nessuna feature da nessun file.")
+        return
+
     # Concatena i dati di tutti i soggetti
     X_features = np.concatenate(all_features, axis=0)
     y_labels = np.concatenate(all_labels, axis=0)
     
-    # Normalizza le feature
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_features)
     
-    # --- Addestramento Modello Classico (Random Forest) ---
     print("\nAddestramento del classificatore classico (Random Forest)...")
     rf_model = models.get_classical_classifier()
-    # Per il modello classico usiamo tutte le feature senza sequenziamento
     X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(
         X_scaled, y_labels, test_size=0.2, random_state=42, stratify=y_labels
     )
@@ -86,9 +83,7 @@ def train_general_model(dataset_path, models_output_dir='models'):
     accuracy = rf_model.score(X_test_rf, y_test_rf)
     print(f"Accuratezza del Random Forest sul set di test: {accuracy:.4f}")
     
-    # --- Addestramento Modello LSTM ---
     print("\nPreparazione delle sequenze per LSTM...")
-    # Esempio con un gap di 1 epoca (previsione dello stadio successivo)
     gap = 1 
     X_seq, y_seq = prepare_sequences(X_scaled, y_labels, LOOK_BACK, gap)
     
@@ -99,7 +94,6 @@ def train_general_model(dataset_path, models_output_dir='models'):
     print(f"Forma delle sequenze di input (X): {X_seq.shape}")
     print(f"Forma delle etichette target (y): {y_seq.shape}")
 
-    # Crea il modello LSTM
     n_features = X_seq.shape[2]
     num_classes = len(np.unique(y_labels))
     lstm_model = models.create_lstm_model(input_shape=(LOOK_BACK, n_features), num_classes=num_classes)
@@ -114,7 +108,6 @@ def train_general_model(dataset_path, models_output_dir='models'):
         validation_split=VALIDATION_SPLIT
     )
 
-    # 4. Salva i modelli e lo scaler
     os.makedirs(models_output_dir, exist_ok=True)
     lstm_model.save(os.path.join(models_output_dir, 'general_lstm_model.h5'))
     joblib.dump(rf_model, os.path.join(models_output_dir, 'general_rf_model.pkl'))
@@ -124,13 +117,7 @@ def train_general_model(dataset_path, models_output_dir='models'):
 
 
 if __name__ == '__main__':
-    # NOTA: Sostituisci con il percorso reale del tuo dataset
-    DATASET_PATH = './sleep-cassette' 
-
-    if not os.path.isdir(DATASET_PATH):
-        print(f"La directory del dataset non è stata trovata in: {DATASET_PATH}")
-        print("Assicurati che il percorso sia corretto.")
-    else:
-        # Avvia l'addestramento del modello generale
-        train_general_model(DATASET_PATH)
-
+    # Esempio: addestra il modello usando i dati dei primi 10 soggetti
+    subjects_to_train_on = list(range(10)) 
+    
+    train_general_model(subjects_to_load=subjects_to_train_on)
