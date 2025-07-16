@@ -1,0 +1,5 @@
+tensorflow
+scikit-learn
+mne
+numpy
+joblib
