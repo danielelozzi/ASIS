@@ -109,4 +109,4 @@ def train_general_model(subjects_to_load, models_output_dir='models'):
     print(f"\nModelli salvati in '{models_output_dir}'.")
 
 if __name__ == '__main__':
-    train_general_model(subjects_to_load=list(range(10)))
+    train_general_model(subjects_to_load=list(range(83)))
