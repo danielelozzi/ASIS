@@ -1,6 +1,6 @@
 # Real-Time Sleep Stage Prediction with PyTorch
 
-This project implements a modular system in Python for real-time sleep stage prediction using EEG data. The core idea is to predict a person's sleep stage at a future point in time, allowing for a configurable "gap" between the last available data and the prediction target. This code is designed to be used into Google Colab.
+This project implements a modular system in Python for real-time sleep stage prediction using EEG data. The core idea is to predict a person's sleep stage at a future point in time, allowing for a configurable "gap" between the last available data and the prediction target. 
 
 The system uses a dual-model approach:
 1.  **LSTM (Long Short-Term Memory) Network (PyTorch)**: To analyze sequences of past sleep epochs and predict a future sleep stage. This is ideal for capturing temporal dependencies in sleep patterns.
