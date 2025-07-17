@@ -1,47 +1,53 @@
 # models.py
 
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+import torch
+import torch.nn as nn
 from sklearn.ensemble import RandomForestClassifier
 
-from config import LSTM_UNITS, LSTM_DROPOUT, LSTM_RECURRENT_DROPOUT, LABEL_MAP
+from config import LSTM_UNITS, LSTM_DROPOUT, LABEL_MAP
 
-def create_lstm_model(input_shape, num_classes):
+def create_lstm_model(input_size, hidden_size, num_layers, num_classes, dropout):
     """
-    Crea e compila un modello LSTM per la previsione degli stadi del sonno.
+    Crea un modello LSTM per la previsione degli stadi del sonno utilizzando PyTorch.
 
     Args:
-        input_shape (tuple): La forma dei dati di input 
-                             (es. (look_back, n_features)).
+        input_size (int): Il numero di feature in input (n_features).
+        hidden_size (int): Il numero di unità nello strato LSTM.
+        num_layers (int): Il numero di strati LSTM.
         num_classes (int): Il numero di stadi del sonno da classificare.
+        dropout (float): Il tasso di dropout da applicare.
 
     Returns:
-        tensorflow.keras.Model: Il modello LSTM compilato.
+        torch.nn.Module: Il modello LSTM.
     """
-    model = Sequential([
-        Input(shape=input_shape),
-        
-        # Strato LSTM per catturare le dipendenze temporali
-        LSTM(
-            units=LSTM_UNITS,
-            dropout=LSTM_DROPOUT,
-            recurrent_dropout=LSTM_RECURRENT_DROPOUT,
-            return_sequences=False # Restituisce solo l'output dell'ultimo step
-        ),
-        
-        # Strato fully-connected per la classificazione finale
-        Dense(units=num_classes, activation='softmax')
-    ])
-    
-    # Compila il modello
-    model.compile(
-        optimizer='adam',
-        loss='sparse_categorical_crossentropy', # Adatto per etichette intere
-        metrics=['accuracy']
-    )
-    
+    class LSTMClassifier(nn.Module):
+        def __init__(self):
+            super(LSTMClassifier, self).__init__()
+            self.lstm = nn.LSTM(
+                input_size,
+                hidden_size,
+                num_layers,
+                batch_first=True, # Aspetta input con forma (batch, seq, feature)
+                dropout=dropout if num_layers > 1 else 0
+            )
+            self.dropout = nn.Dropout(dropout)
+            self.fc = nn.Linear(hidden_size, num_classes)
+
+        def forward(self, x):
+            # L'output di LSTM è (output, (h_n, c_n))
+            # Usiamo solo l'output dell'ultimo time step
+            lstm_out, _ = self.lstm(x)
+            
+            # Prendi l'output dell'ultimo time step
+            last_output = lstm_out[:, -1, :]
+            
+            out = self.dropout(last_output)
+            out = self.fc(out)
+            return out
+
+    model = LSTMClassifier()
     return model
+
 
 def get_classical_classifier(n_estimators=100, random_state=42):
     """
@@ -54,7 +60,6 @@ def get_classical_classifier(n_estimators=100, random_state=42):
     Returns:
         sklearn.ensemble.RandomForestClassifier: Un classificatore Random Forest.
     """
-    # Il Random Forest è una scelta robusta per questo tipo di dati tabellari (le feature PSD)
     classifier = RandomForestClassifier(
         n_estimators=n_estimators,
         random_state=random_state,
@@ -65,25 +70,26 @@ def get_classical_classifier(n_estimators=100, random_state=42):
 if __name__ == '__main__':
     # Esempio di utilizzo e visualizzazione dei modelli
     
-    # --- Esempio LSTM ---
-    print("--- Architettura Modello LSTM ---")
+    # --- Esempio LSTM con PyTorch ---
+    print("--- Architettura Modello LSTM (PyTorch) ---")
     # Parametri di esempio
-    look_back = 10  # Numero di epoche passate da considerare
-    n_features = 10 # 2 canali * 5 bande di frequenza
+    look_back = 10
+    n_features = 10
     num_sleep_stages = len(LABEL_MAP)
     
     # Crea il modello LSTM
     lstm_model = create_lstm_model(
-        input_shape=(look_back, n_features),
-        num_classes=num_sleep_stages
+        input_size=n_features,
+        hidden_size=LSTM_UNITS,
+        num_layers=1,
+        num_classes=num_sleep_stages,
+        dropout=LSTM_DROPOUT
     )
     
-    # Stampa un riassunto dell'architettura
-    lstm_model.summary()
+    # Stampa l'architettura del modello
+    print(lstm_model)
     
     # --- Esempio Classificatore Classico ---
     print("\n\n--- Classificatore Classico ---")
     classical_model = get_classical_classifier()
     print("Modello scelto:", classical_model)
-    print("I parametri possono essere modificati, es: get_classical_classifier(n_estimators=200)")
-

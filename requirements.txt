@@ -1,4 +1,4 @@
-tensorflow
+torch
 scikit-learn
 mne
 numpy
