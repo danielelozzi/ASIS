@@ -1,82 +1,81 @@
-# Real-Time Sleep Stage Prediction with PyTorch
+# Predizione degli Stadi del Sonno con Validazione "Leave-One-Subject-Out"
 
-This project implements a modular system in Python for real-time sleep stage prediction using EEG data. The core idea is to predict a person's sleep stage at a future point in time, allowing for a configurable "gap" between the last available data and the prediction target. 
+Questo progetto implementa un sistema avanzato in Python per la predizione degli stadi del sonno, utilizzando un approccio di validazione incrociata di tipo **"Leave-One-Subject-Out" (LOSO)**. Questo metodo garantisce che il modello venga testato su dati di un soggetto mai visto durante l'addestramento, fornendo una stima robusta delle sue performance nel mondo reale.
 
-The system uses a dual-model approach:
-1.  **LSTM (Long Short-Term Memory) Network (PyTorch)**: To analyze sequences of past sleep epochs and predict a future sleep stage. This is ideal for capturing temporal dependencies in sleep patterns.
-2.  **Random Forest Classifier**: As a baseline, this model classifies the *current* sleep stage based on the features of a single epoch, confirming the system's ability to process the data effectively.
+Il sistema predice gli stadi futuri del sonno a diversi intervalli di tempo (es. 30, 60, 90, 120 minuti) e genera un'analisi dettagliata delle performance per ogni soggetto testato.
 
-This work is a practical implementation and continuation of the concepts presented in the following research paper:
+## Architettura e Modelli
+
+Il sistema utilizza un approccio a doppio modello:
+
+1.  **LSTM (Long Short-Term Memory) Network (PyTorch)**: Analizza sequenze di epoche passate per predire uno stadio del sonno futuro. Ideale per catturare le dipendenze temporali nei pattern di sonno.
+2.  **Random Forest Classifier (Scikit-learn)**: Funge da modello di riferimento, classificando lo stadio del sonno *attuale* basandosi sulle feature di una singola epoca.
+
+Questo lavoro è un'implementazione pratica e una continuazione dei concetti presentati nel seguente articolo di ricerca:
 > Lozzi, D., Di Matteo, A., Mattei, E., Cipriani, A., Caianiello, P., Mignosi, F., & Placidi, G. (2024, October). ASIS: A Smart Alarm Clock Based on Deep Learning for the Safety of Night Workers. In *2024 IEEE International Conference on Metrology for eXtended Reality, Artificial Intelligence and Neural Engineering (MetroXRAINE)* (pp. 1129-1134). IEEE.
 
-### BibTeX Citation
-```bibtex
-@inproceedings{lozzi2024asis,
-  title={ASIS: A Smart Alarm Clock Based on Deep Learning for the Safety of Night Workers},
-  author={Lozzi, Daniele and Di Matteo, Alessandro and Mattei, Enrico and Cipriani, Alessia and Caianiello, Pasquale and Mignosi, Filippo and Placidi, Giuseppe},
-  booktitle={2024 IEEE International Conference on Metrology for eXtended Reality, Artificial Intelligence and Neural Engineering (MetroXRAINE)},
-  pages={1129--1134},
-  year={2024},
-  organization={IEEE}
-}
-```
+## Funzionalità Principali
 
----
+-   **Validazione Robusta**: Implementa una pipeline di cross-validazione "Leave-One-Subject-Out" (LOSO).
+-   **Predizione Multi-Gap**: Addestra un singolo modello (con un gap di 30 min) e lo valuta su più orizzonti temporali (30, 60, 90, 120 min).
+-   **Reportistica Automatica**: Per ogni fold della validazione (cioè per ogni soggetto usato come test), il sistema genera automaticamente:
+    -   Un file **JSON** con la cronologia di addestramento (loss e accuracy per epoca).
+    -   Un **grafico PDF** che mostra l'andamento di loss e accuracy durante l'addestramento.
+    -   **Matrici di confusione in PDF** sia per il Random Forest sia per l'LSTM (per ogni gap di previsione), con titoli dettagliati.
+-   **Risultati Aggregati**: Al termine dell'esperimento, vengono creati file CSV con le performance medie e per singolo fold.
+-   **Download Automatico dei Dati**: Utilizza `mne` per scaricare e gestire il dataset PhysioNet Sleep-EDF.
 
-## Features
+## Struttura del Progetto
 
-- **Modular Design**: The code is split into logical modules for configuration, data loading, feature extraction, modeling, training, and prediction.
-- **Automatic Data Fetching**: Uses the `mne` library to automatically download and cache the PhysioNet Sleep-EDF dataset, simplifying setup.
-- **Configurable Prediction Gap**: Easily adjust how far into the future the model predicts.
-- **Real-Time Simulation**: The `predict.py` script simulates how the system would operate overnight, making periodic predictions.
+-   `config.py`: Parametri globali (gap di previsione, epoche, etc.).
+-   `data_loader.py`: Caricamento e gestione dei dati del dataset.
+-   `feature_extractor.py`: Calcolo delle feature Power Spectral Density (PSD).
+-   `models.py`: Definizione dei modelli PyTorch (LSTM) e Scikit-learn (RF).
+-   `train.py`: Funzioni per l'addestramento dei modelli su un set di soggetti.
+-   `predict.py`: Funzioni per la valutazione dei modelli su un soggetto di test.
+-   `run_loso_experiment.py`: **Script principale** per orchestrare l'intero esperimento LOSO.
+-   `utils.py`: Funzioni di utilità per grafici, matrici di confusione e salvataggio file.
+-   `requirements.txt`: Dipendenze Python del progetto.
 
-## Project Structure
+## Installazione
 
-The project is organized into the following Python scripts:
-
--   `config.py`: A central file for all global parameters.
--   `data_loader.py`: Handles the automatic download and loading of data using MNE-Python. 
--   `feature_extractor.py`: Calculates Power Spectral Density (PSD) features.
--   `models.py`: Defines the Keras LSTM and Scikit-learn Random Forest models.
--   `train.py`: Orchestrates the training pipeline.
--   `predict.py`: Loads pre-trained models to run a prediction simulation.
--   `requirements.txt`: Lists all necessary Python packages.
-
-## Installation
-
-1.  **Clone the repository:**
+1.  **Clona il repository:**
     ```bash
     git clone <your-repository-url>
     cd <your-repository-name>
     ```
 
-2.  **Install the required dependencies:**
-    It is recommended to use a virtual environment.
+2.  **Crea un ambiente virtuale (consigliato) e installa le dipendenze:**
     ```bash
+    python -m venv venv
+    source venv/bin/activate  # Su Windows: venv\Scripts\activate
     pip install -r requirements.txt
     ```
-    **Note:** The dataset will be downloaded automatically by the `data_loader.py` script on the first run. You no longer need to download it manually.
+    **Nota:** Il dataset verrà scaricato automaticamente alla prima esecuzione.
 
-## How to Use
+## Come Eseguire l'Esperimento
 
-The process is divided into two main steps: training and prediction.
+L'intero processo è gestito dallo script `run_loso_experiment.py`.
 
-### 1. Train the Models
+1.  **Configura l'Esperimento**:
+    Apri `run_loso_experiment.py` e modifica la lista `subjects_for_experiment`. Per un test rapido, puoi usare un piccolo numero di soggetti (es. `list(range(4))`). Per l'esperimento completo, usa `list(range(83))`.
 
-First, you need to train the models. The `train.py` script is configured to use a specific number of subjects from the dataset for training. On the first run, MNE will download the necessary data, which may take some time.
+2.  **Avvia l'Esperimento**:
+    Esegui lo script dal terminale:
+    ```bash
+    python run_loso_experiment.py
+    ```
 
-```bash
-python train.py
-```
+## Analisi dei Risultati
 
-This will create a `models/` directory containing the trained LSTM model (`.h5`), the Random Forest model (`.pkl`), and the data scaler (`.pkl`). You can change the number of subjects to train on by editing the `subjects_to_train_on` list at the bottom of `train.py`.
+Al termine dell'esecuzione, troverai una nuova directory `outputs/`. Al suo interno, ci sarà una sottodirectory per ogni fold dell'esperimento (es. `fold_test_subject_0/`), contenente:
 
-### 2. Run a Prediction Simulation
+-   `training_history.json`: Dati di loss/accuracy per epoca.
+-   `training_history.pdf`: Grafico dell'andamento dell'addestramento.
+-   `confusion_matrix_rf.pdf`: Matrice di confusione per il Random Forest.
+-   `confusion_matrix_lstm_30min.pdf`, `..._60min.pdf`, etc.: Matrici di confusione per l'LSTM per ogni gap di valutazione.
 
-Once the models are trained and saved, you can run a simulation to see the prediction system in action. The `predict.py` script will download the data for a specific subject (if not already cached) and output real-time predictions for future sleep stages.
+Nella directory `outputs/` principale, troverai anche due file CSV riassuntivi:
 
-```bash
-python predict.py
-```
-
-You can customize the simulation by editing the parameters in `predict.py`, such as the subject ID, `prediction_gap_minutes`, and `update_interval_minutes`.
+-   `loso_results_per_fold.csv`: Metriche di accuratezza dettagliate per ogni soggetto di test.
+-   `loso_results_summary.csv`: Medie e deviazioni standard di tutte le metriche, per una visione d'insieme delle performance del modello.
