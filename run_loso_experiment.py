@@ -4,8 +4,8 @@ import predict
 import pandas as pd
 import utils
 from config import (
-    OUTPUTS_DIR, UNIQUE_CLASS_NAMES, EVALUATION_GAPS_MINUTES,
-    TRAIN_PREDICTION_GAP_MINUTES, LOOK_BACK
+    OUTPUTS_DIR, UNIQUE_CLASS_NAMES,
+    TRAIN_PREDICTION_GAP_MINUTES, LOOK_BACK, EPOCH_DURATION # <-- CORREZIONE QUI
 )
 
 def run_loso_experiment(all_subject_ids):
