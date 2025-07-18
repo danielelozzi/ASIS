@@ -19,5 +19,14 @@ def create_lstm_model(input_size, hidden_size, num_layers, num_classes, dropout)
             return out
     return LSTMClassifier()
 
-def get_classical_classifier(n_estimators=100, random_state=42):
-    return RandomForestClassifier(n_estimators=n_estimators, random_state=random_state, n_jobs=-1)
+def get_classical_classifier(n_estimators=100, random_state=42, class_weight='balanced'):
+    """
+    Restituisce un classificatore Random Forest.
+    'class_weight' è impostato su 'balanced' per gestire lo squilibrio delle classi.
+    """
+    return RandomForestClassifier(
+        n_estimators=n_estimators,
+        random_state=random_state,
+        class_weight=class_weight, # <-- MODIFICA CHIAVE
+        n_jobs=-1
+    )

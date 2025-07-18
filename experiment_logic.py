@@ -3,7 +3,7 @@
 import os
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import models
 from config import (
     LOOK_BACK, BATCH_SIZE, EPOCHS, VALIDATION_SPLIT, LSTM_UNITS,
-    LSTM_DROPOUT, PREDICTION_TARGET_GAP_MINUTES, EPOCH_DURATION
+    LSTM_DROPOUT, PREDICTION_TARGET_GAP_MINUTES, EPOCH_DURATION, UNIQUE_CLASS_NAMES
 )
 
 def prepare_sequences(features, labels, look_back, gap_epochs):
@@ -23,20 +23,36 @@ def prepare_sequences(features, labels, look_back, gap_epochs):
     return np.array(X), np.array(y)
 
 def train_and_evaluate_rf(train_features, train_labels, test_features, test_labels):
-    """Addestra e valuta un modello Random Forest."""
+    """Addestra e valuta un modello Random Forest, restituendo anche il report."""
     print("Addestramento e valutazione Random Forest...")
     scaler = StandardScaler()
     train_scaled = scaler.fit_transform(train_features)
     test_scaled = scaler.transform(test_features)
     
+    # Chiama il modello che ora è bilanciato di default
     model = models.get_classical_classifier()
     model.fit(train_scaled, train_labels)
     
     predictions = model.predict(test_scaled)
     accuracy = accuracy_score(test_labels, predictions)
     
+    # Genera il report di classificazione
+    report = classification_report(
+        test_labels, 
+        predictions, 
+        target_names=UNIQUE_CLASS_NAMES,
+        zero_division=0
+    )
+    
     print(f"RF Accuracy: {accuracy:.4f}")
-    return {'accuracy': accuracy, 'y_true': test_labels, 'y_pred': predictions}
+    print("RF Classification Report:\n", report)
+    
+    return {
+        'accuracy': accuracy, 
+        'y_true': test_labels, 
+        'y_pred': predictions,
+        'report': report # Aggiunto il report ai risultati
+    }
 
 def train_and_evaluate_lstm(train_features, train_labels, test_features, test_labels):
     """Addestra e valuta un modello LSTM."""
@@ -44,7 +60,6 @@ def train_and_evaluate_lstm(train_features, train_labels, test_features, test_la
     scaler = StandardScaler()
     train_scaled = scaler.fit_transform(train_features)
     
-    # Preparazione sequenze di training
     gap_epochs = int(PREDICTION_TARGET_GAP_MINUTES * 60 / EPOCH_DURATION)
     X_train_seq, y_train_seq = prepare_sequences(train_scaled, train_labels, LOOK_BACK, gap_epochs)
     
@@ -52,7 +67,6 @@ def train_and_evaluate_lstm(train_features, train_labels, test_features, test_la
         print("Non ci sono abbastanza dati di training per creare sequenze LSTM.")
         return None, None
 
-    # Addestramento LSTM
     n_features = X_train_seq.shape[2]
     num_classes = len(np.unique(train_labels))
     model = models.create_lstm_model(n_features, LSTM_UNITS, 1, num_classes, LSTM_DROPOUT)
@@ -96,9 +110,7 @@ def train_and_evaluate_lstm(train_features, train_labels, test_features, test_la
         history['val_acc'].append(val_correct / val_total)
         print(f"Epoch {epoch+1}/{EPOCHS} -> Val Acc: {val_correct / val_total:.4f}")
 
-    # Valutazione LSTM
     test_scaled = scaler.transform(test_features)
-    # Le sequenze di test partono dall'inizio, per predire dal punto `len(train_features)` in poi
     X_test_seq, y_test_true = prepare_sequences(test_scaled, test_labels, LOOK_BACK, gap_epochs)
 
     if len(X_test_seq) == 0:

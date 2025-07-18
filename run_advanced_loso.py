@@ -26,14 +26,12 @@ def run_experiment(all_subject_ids):
         
         train_subject_ids = [s_id for s_id in all_subject_ids if s_id != test_subject_id]
         
-        # Carica i dati del soggetto di test una sola volta
         test_files = data_loader.fetch_physionet_subjects(subjects=[test_subject_id])
         if not test_files: continue
         test_data_full, test_labels_full = data_loader.load_sleep_data(test_files[0][0], test_files[0][1])
         if test_data_full is None: continue
         test_features_full = feature_extractor.extract_psd_features(test_data_full)
 
-        # Carica i dati di tutti i soggetti di training una sola volta
         train_files = data_loader.fetch_physionet_subjects(subjects=train_subject_ids)
         train_subjects_data = {}
         for i, (psg, annot) in enumerate(train_files):
@@ -47,7 +45,6 @@ def run_experiment(all_subject_ids):
             print(f"\n--- Finestra di Training: {window_min} minuti ---")
             window_epochs = int(window_min * 60 / EPOCH_DURATION)
             
-            # Prepara i dati di training per questa finestra
             train_features_window = np.concatenate([d['features'][:window_epochs] for d in train_subjects_data.values() if len(d['features']) >= window_epochs])
             train_labels_window = np.concatenate([d['labels'][:window_epochs] for d in train_subjects_data.values() if len(d['labels']) >= window_epochs])
             
@@ -55,7 +52,7 @@ def run_experiment(all_subject_ids):
                 print(f"Nessun dato di training per la finestra di {window_min} min. Salto.")
                 continue
 
-            # --- Task 1: Random Forest (classificazione sulla stessa finestra) ---
+            # --- Task 1: Random Forest ---
             test_features_window = test_features_full[:window_epochs]
             test_labels_window = test_labels_full[:window_epochs]
             if len(test_features_window) > 0:
@@ -67,13 +64,23 @@ def run_experiment(all_subject_ids):
                     'test_subject': test_subject_id, 'model': 'RandomForest',
                     'train_window_min': window_min, 'accuracy': rf_results['accuracy']
                 })
-                # Salva matrice di confusione
-                title = f"RF - Test Subj {test_subject_id}\nTrain Window: {window_min} min"
-                filepath = os.path.join(OUTPUTS_DIR, f"fold_{test_subject_id}", f"cm_rf_window_{window_min}min.pdf")
-                utils.plot_confusion_matrix(rf_results['y_true'], rf_results['y_pred'], UNIQUE_CLASS_NAMES, title, filepath)
+                
+                # Salva report e matrice di confusione per RF
+                fold_dir = os.path.join(OUTPUTS_DIR, f"fold_{test_subject_id}")
+                
+                title_cm = f"RF - Test Subj {test_subject_id}\nTrain Window: {window_min} min"
+                filepath_cm = os.path.join(fold_dir, f"cm_rf_window_{window_min}min.pdf")
+                utils.plot_confusion_matrix(rf_results['y_true'], rf_results['y_pred'], UNIQUE_CLASS_NAMES, title_cm, filepath_cm)
+                
+                filepath_report = os.path.join(fold_dir, f"report_rf_window_{window_min}min.txt")
+                with open(filepath_report, 'w') as f:
+                    f.write(f"Classification Report for Random Forest\n")
+                    f.write(f"Test Subject: {test_subject_id}\n")
+                    f.write(f"Training Window: {window_min} minutes\n\n")
+                    f.write(rf_results['report'])
+                print(f"Report RF salvato in: {filepath_report}")
 
-            # --- Task 2: LSTM (predizione del futuro) ---
-            # Il test set per LSTM sono TUTTI i dati del soggetto di test
+            # --- Task 2: LSTM ---
             lstm_results, history = experiment_logic.train_and_evaluate_lstm(
                 train_features_window, train_labels_window,
                 test_features_full, test_labels_full
@@ -84,7 +91,7 @@ def run_experiment(all_subject_ids):
                     'test_subject': test_subject_id, 'model': 'LSTM',
                     'train_window_min': window_min, 'accuracy': lstm_results['accuracy']
                 })
-                # Salva output grafici per LSTM
+                
                 base_path = os.path.join(OUTPUTS_DIR, f"fold_{test_subject_id}", f"lstm_train_window_{window_min}min")
                 title_hist = f"LSTM History - Test Subj {test_subject_id}\nTrain Window: {window_min} min"
                 utils.plot_history(history, title_hist, f"{base_path}_history.pdf")
@@ -110,10 +117,7 @@ def run_experiment(all_subject_ids):
     print(f"\nRisultati salvati nella directory '{OUTPUTS_DIR}'")
 
 if __name__ == '__main__':
-    # Esempio con 3 soggetti per testare la pipeline
-    subjects_for_experiment = list(range(10)) 
-    
-    # Per l'esperimento completo (83 soggetti), decommentare:
+    subjects_for_experiment = list(range(3)) 
     # subjects_for_experiment = list(range(83))
     
     run_experiment(all_subject_ids=subjects_for_experiment)

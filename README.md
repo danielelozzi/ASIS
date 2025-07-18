@@ -1,41 +1,61 @@
-# Predizione degli Stadi del Sonno con Validazione "Leave-One-Subject-Out"
+# Predizione Avanzata degli Stadi del Sonno con Addestramento Incrementale e Validazione LOSO
 
-Questo progetto implementa un sistema avanzato in Python per la predizione degli stadi del sonno, utilizzando un approccio di validazione incrociata di tipo **"Leave-One-Subject-Out" (LOSO)**. Questo metodo garantisce che il modello venga testato su dati di un soggetto mai visto durante l'addestramento, fornendo una stima robusta delle sue performance nel mondo reale.
+Questo progetto implementa una pipeline di valutazione rigorosa per modelli di predizione degli stadi del sonno, basata su un approccio di **addestramento incrementale** e validazione incrociata **"Leave-One-Subject-Out" (LOSO)**.
 
-Il sistema predice gli stadi futuri del sonno a diversi intervalli di tempo (es. 30, 60, 90, 120 minuti) e genera un'analisi dettagliata delle performance per ogni soggetto testato.
+Lo scopo è simulare uno scenario realistico in cui un modello viene addestrato con una quantità crescente di dati (es. i primi 30, 60, 90 minuti di sonno) per valutare come le sue performance evolvono nel tempo.
 
-## Architettura e Modelli
-
-Il sistema utilizza un approccio a doppio modello:
-
-1.  **LSTM (Long Short-Term Memory) Network (PyTorch)**: Analizza sequenze di epoche passate per predire uno stadio del sonno futuro. Ideale per catturare le dipendenze temporali nei pattern di sonno.
-2.  **Random Forest Classifier (Scikit-learn)**: Funge da modello di riferimento, classificando lo stadio del sonno *attuale* basandosi sulle feature di una singola epoca.
+## Riferimento Scientifico
 
 Questo lavoro è un'implementazione pratica e una continuazione dei concetti presentati nel seguente articolo di ricerca:
 > Lozzi, D., Di Matteo, A., Mattei, E., Cipriani, A., Caianiello, P., Mignosi, F., & Placidi, G. (2024, October). ASIS: A Smart Alarm Clock Based on Deep Learning for the Safety of Night Workers. In *2024 IEEE International Conference on Metrology for eXtended Reality, Artificial Intelligence and Neural Engineering (MetroXRAINE)* (pp. 1129-1134). IEEE.
 
+### Citazione BibTeX
+```bibtex
+@inproceedings{lozzi2024asis,
+  title={ASIS: A Smart Alarm Clock Based on Deep Learning for the Safety of Night Workers},
+  author={Lozzi, Daniele and Di Matteo, Alessandro and Mattei, Enrico and Cipriani, Alessia and Caianiello, Pasquale and Mignosi, Filippo and Placidi, Giuseppe},
+  booktitle={2024 IEEE International Conference on Metrology for eXtended Reality, Artificial Intelligence and Neural Engineering (MetroXRAINE)},
+  pages={1129--1134},
+  year={2024},
+  organization={IEEE}
+}
+```
+
+## Logica Sperimentale
+
+L'esperimento segue una struttura di validazione LOSO. Per ogni soggetto del dataset (usato a rotazione come "soggetto di test"):
+
+1.  **Finestre di Addestramento Crescenti**: Vengono definite diverse finestre temporali (es. 30, 60, 90, 120 minuti).
+2.  **Addestramento per Finestra**: Per ogni finestra temporale, vengono addestrati due modelli distinti utilizzando i dati di tutti gli altri soggetti ("soggetti di training"):
+    * **Random Forest (Classificazione Istantanea)**:
+        * **Addestramento**: Utilizza i dati dei soggetti di training *fino alla fine della finestra corrente* (es. i primi 30 minuti).
+        * **Valutazione**: Classifica gli stadi del sonno del soggetto di test *all'interno della stessa finestra* (es. i suoi primi 30 minuti).
+    * **LSTM (Predizione Futura)**:
+        * **Addestramento**: Utilizza i dati dei soggetti di training *fino alla fine della finestra corrente*.
+        * **Valutazione**: Predice gli stadi del sonno futuri per l'**intera notte** del soggetto di test.
+
+Questo approccio permette di rispondere a domande come: "Quanti dati servono per ottenere una predizione affidabile?" e "Come si comporta il modello su dati mai visti prima?".
+
 ## Funzionalità Principali
 
--   **Validazione Robusta**: Implementa una pipeline di cross-validazione "Leave-One-Subject-Out" (LOSO).
--   **Predizione Multi-Gap**: Addestra un singolo modello (con un gap di 30 min) e lo valuta su più orizzonti temporali (30, 60, 90, 120 min).
--   **Reportistica Automatica**: Per ogni fold della validazione (cioè per ogni soggetto usato come test), il sistema genera automaticamente:
-    -   Un file **JSON** con la cronologia di addestramento (loss e accuracy per epoca).
-    -   Un **grafico PDF** che mostra l'andamento di loss e accuracy durante l'addestramento.
-    -   **Matrici di confusione in PDF** sia per il Random Forest sia per l'LSTM (per ogni gap di previsione), con titoli dettagliati.
--   **Risultati Aggregati**: Al termine dell'esperimento, vengono creati file CSV con le performance medie e per singolo fold.
--   **Download Automatico dei Dati**: Utilizza `mne` per scaricare e gestire il dataset PhysioNet Sleep-EDF.
+-   **Validazione LOSO**: Garantisce una stima robusta e generalizzabile delle performance.
+-   **Addestramento Incrementale**: I modelli vengono ri-addestrati su finestre di dati crescenti.
+-   **Valutazione a Doppio Task**: Analisi sia della classificazione istantanea (RF) sia della predizione futura (LSTM).
+-   **Reportistica Automatica e Dettagliata**: Per ogni configurazione (soggetto di test, finestra di training), il sistema genera:
+    -   Grafici **PDF** con le curve di apprendimento (loss e accuracy).
+    -   Matrici di confusione **PDF** per ogni modello, con titoli che specificano le condizioni dell'esperimento.
+-   **Risultati Aggregati**: Al termine, vengono creati file **CSV** con i risultati dettagliati e un riepilogo delle performance medie.
 
 ## Struttura del Progetto
 
--   `config.py`: Parametri globali (gap di previsione, epoche, etc.).
--   `data_loader.py`: Caricamento e gestione dei dati del dataset.
--   `feature_extractor.py`: Calcolo delle feature Power Spectral Density (PSD).
--   `models.py`: Definizione dei modelli PyTorch (LSTM) e Scikit-learn (RF).
--   `train.py`: Funzioni per l'addestramento dei modelli su un set di soggetti.
--   `predict.py`: Funzioni per la valutazione dei modelli su un soggetto di test.
--   `run_loso_experiment.py`: **Script principale** per orchestrare l'intero esperimento LOSO.
--   `utils.py`: Funzioni di utilità per grafici, matrici di confusione e salvataggio file.
--   `requirements.txt`: Dipendenze Python del progetto.
+-   `config.py`: Parametri globali, incluse le finestre di addestramento.
+-   `data_loader.py`: Caricamento dati, con opzione per limitare le epoche.
+-   `feature_extractor.py`: Estrazione delle feature PSD.
+-   `models.py`: Definizione dei modelli.
+-   `experiment_logic.py`: **Nuovo file** che incapsula la logica di addestramento e valutazione per una singola configurazione.
+-   `run_advanced_loso.py`: **Script principale** che orchestra l'intero esperimento LOSO avanzato.
+-   `utils.py`: Funzioni di utilità per la creazione di grafici e il salvataggio dei risultati.
+-   `requirements.txt`: Dipendenze del progetto.
 
 ## Installazione
 
@@ -45,37 +65,33 @@ Questo lavoro è un'implementazione pratica e una continuazione dei concetti pre
     cd <your-repository-name>
     ```
 
-2.  **Crea un ambiente virtuale (consigliato) e installa le dipendenze:**
+2.  **Crea un ambiente virtuale e installa le dipendenze:**
     ```bash
     python -m venv venv
     source venv/bin/activate  # Su Windows: venv\Scripts\activate
     pip install -r requirements.txt
     ```
-    **Nota:** Il dataset verrà scaricato automaticamente alla prima esecuzione.
 
 ## Come Eseguire l'Esperimento
 
-L'intero processo è gestito dallo script `run_loso_experiment.py`.
+L'intero processo è gestito dallo script `run_advanced_loso.py`.
 
 1.  **Configura l'Esperimento**:
-    Apri `run_loso_experiment.py` e modifica la lista `subjects_for_experiment`. Per un test rapido, puoi usare un piccolo numero di soggetti (es. `list(range(4))`). Per l'esperimento completo, usa `list(range(83))`.
+    Apri `run_advanced_loso.py` e modifica la lista `subjects_for_experiment`.
+
+    **ATTENZIONE**: Questo esperimento è **estremamente intensivo** dal punto di vista computazionale. Si consiglia vivamente di iniziare con un piccolo numero di soggetti (es. `list(range(3))`) per verificare che la pipeline funzioni correttamente.
 
 2.  **Avvia l'Esperimento**:
     Esegui lo script dal terminale:
     ```bash
-    python run_loso_experiment.py
+    python run_advanced_loso.py
     ```
 
 ## Analisi dei Risultati
 
-Al termine dell'esecuzione, troverai una nuova directory `outputs/`. Al suo interno, ci sarà una sottodirectory per ogni fold dell'esperimento (es. `fold_test_subject_0/`), contenente:
+Al termine, verrà creata una directory `outputs_advanced/`. Al suo interno:
 
--   `training_history.json`: Dati di loss/accuracy per epoca.
--   `training_history.pdf`: Grafico dell'andamento dell'addestramento.
--   `confusion_matrix_rf.pdf`: Matrice di confusione per il Random Forest.
--   `confusion_matrix_lstm_30min.pdf`, `..._60min.pdf`, etc.: Matrici di confusione per l'LSTM per ogni gap di valutazione.
-
-Nella directory `outputs/` principale, troverai anche due file CSV riassuntivi:
-
--   `loso_results_per_fold.csv`: Metriche di accuratezza dettagliate per ogni soggetto di test.
--   `loso_results_summary.csv`: Medie e deviazioni standard di tutte le metriche, per una visione d'insieme delle performance del modello.
+-   **Sottodirectory per Fold**: Una cartella per ogni soggetto di test (es. `fold_test_subject_0/`), contenente tutti i grafici (matrici di confusione e cronologie di addestramento) generati per quel soggetto nelle varie configurazioni.
+-   **File CSV Riepilogativi**:
+    -   `advanced_loso_results.csv`: Contiene i risultati grezzi (accuratezza) per ogni singola esecuzione (soggetto, modello, finestra di training).
+    -   `advanced_loso_summary.csv`: Fornisce una vista aggregata, mostrando media e deviazione standard delle performance per ogni combinazione di modello e finestra di training. Questo è il file più importante per trarre conclusioni generali.

@@ -17,6 +17,7 @@ CLASS_NAMES = {v: k.replace('Sleep stage ', '') for k, v in LABEL_MAP.items()}
 CLASS_NAMES[3] = "N3/N4"
 UNIQUE_CLASS_NAMES = sorted(list(set(CLASS_NAMES.values())), key=lambda x: list(CLASS_NAMES.keys())[list(CLASS_NAMES.values()).index(x)])
 
+
 # Parametri modello LSTM
 LSTM_UNITS = 64
 LSTM_DROPOUT = 0.2
@@ -27,10 +28,10 @@ BATCH_SIZE = 32
 EPOCHS = 15 # Ridotto per la complessità dell'esperimento
 VALIDATION_SPLIT = 0.2
 
-# NUOVO: Finestre temporali per l'addestramento incrementale (in minuti)
+# Finestre temporali per l'addestramento incrementale (in minuti)
 TRAINING_WINDOWS_MINUTES = [30, 60, 90, 120]
 
-# NUOVO: Gap di predizione per LSTM (in minuti, dopo la fine della finestra di training)
+# Gap di predizione per LSTM (in minuti, dopo la fine della finestra di training)
 PREDICTION_TARGET_GAP_MINUTES = 1 # Predici 1 minuto dopo la fine dei dati di training
 
 # Elettrodi

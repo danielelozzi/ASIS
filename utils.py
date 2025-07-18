@@ -47,12 +47,22 @@ def plot_confusion_matrix(y_true, y_pred, class_names, title, filepath):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     print(f"Creazione matrice di confusione in: {filepath}")
     
-    # Rimuovi le classi non presenti nei dati reali o predetti
     present_labels = sorted(list(set(y_true) | set(y_pred)))
-    present_class_names = [name for i, name in enumerate(class_names) if i in present_labels]
     
+    # Assicura che i nomi delle classi corrispondano alle etichette presenti
+    # Questo è un po' più robusto se una classe non appare mai.
+    try:
+        present_class_names = [class_names[i] for i in present_labels]
+    except IndexError:
+        present_class_names = [f"Class {i}" for i in present_labels]
+
+
     cm = confusion_matrix(y_true, y_pred, labels=present_labels)
-    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    
+    # Normalizzazione sicura per evitare divisione per zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    cm_normalized = np.nan_to_num(cm_normalized) # Sostituisce NaN con 0
     
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm_normalized, annot=True, fmt=".2f", cmap="Blues",
