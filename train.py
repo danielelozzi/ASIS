@@ -1,8 +1,5 @@
-# train.py
-
 import os
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import joblib
 import torch
@@ -13,30 +10,23 @@ from torch.utils.data import DataLoader, TensorDataset
 import data_loader
 import feature_extractor
 import models
+import utils
 from config import (
-    LOOK_BACK, 
-    BATCH_SIZE, 
-    EPOCHS, 
-    VALIDATION_SPLIT, 
-    LSTM_UNITS,
-    LSTM_DROPOUT,
-    TRAIN_PREDICTION_GAP_MINUTES,
-    EPOCH_DURATION
+    LOOK_BACK, BATCH_SIZE, EPOCHS, VALIDATION_SPLIT, LSTM_UNITS,
+    LSTM_DROPOUT, TRAIN_PREDICTION_GAP_MINUTES, EPOCH_DURATION
 )
 
 def prepare_sequences(features, labels, look_back, gap_epochs):
     """ Prepara sequenze per l'LSTM. """
     X, y = [], []
-    # Assicurati di non andare fuori dai limiti dell'array
     for i in range(len(features) - look_back - gap_epochs):
         X.append(features[i:i + look_back])
         y.append(labels[i + look_back + gap_epochs])
     return np.array(X), np.array(y)
 
-# MODIFICATA: La funzione ora accetta parametri per essere riutilizzabile
-def train_on_subjects(subjects_to_load, models_output_dir='models'):
+def train_on_subjects(subjects_to_load, models_output_dir):
     """
-    Addestra i modelli sui soggetti specificati e li salva nella directory data.
+    Addestra i modelli sui soggetti specificati e salva i risultati.
     """
     print(f"--- Inizio Addestramento per {len(subjects_to_load)} soggetti ---")
     print(f"--- I modelli verranno salvati in: {models_output_dir} ---")
@@ -44,7 +34,7 @@ def train_on_subjects(subjects_to_load, models_output_dir='models'):
     all_files = data_loader.fetch_physionet_subjects(subjects=subjects_to_load)
     if not all_files:
         print("\nERRORE: Nessun file di dati trovato.")
-        return
+        return None
 
     all_features, all_labels = [], []
     for psg_path, annot_path in all_files:
@@ -56,7 +46,7 @@ def train_on_subjects(subjects_to_load, models_output_dir='models'):
     
     if not all_features:
         print("\nERRORE: Nessuna feature estratta. Impossibile continuare.")
-        return
+        return None
 
     X_features = np.concatenate(all_features)
     y_labels = np.concatenate(all_labels)
@@ -66,12 +56,10 @@ def train_on_subjects(subjects_to_load, models_output_dir='models'):
     
     print("\nAddestramento Random Forest...")
     rf_model = models.get_classical_classifier()
-    # Non c'è bisogno di un test set qui, usiamo tutti i dati di training
     rf_model.fit(X_scaled, y_labels)
     print("Addestramento Random Forest completato.")
     
     print("\nPreparazione sequenze per LSTM...")
-    # Calcola il gap in numero di epoche
     gap_epochs = int(TRAIN_PREDICTION_GAP_MINUTES * 60 / EPOCH_DURATION)
     X_seq, y_seq = prepare_sequences(X_scaled, y_labels, LOOK_BACK, gap_epochs)
     
@@ -79,11 +67,8 @@ def train_on_subjects(subjects_to_load, models_output_dir='models'):
     num_classes = len(np.unique(y_labels))
     
     lstm_model = models.create_lstm_model(
-        input_size=n_features,
-        hidden_size=LSTM_UNITS,
-        num_layers=1,
-        num_classes=num_classes,
-        dropout=LSTM_DROPOUT
+        input_size=n_features, hidden_size=LSTM_UNITS,
+        num_layers=1, num_classes=num_classes, dropout=LSTM_DROPOUT
     )
     
     dataset = TensorDataset(torch.tensor(X_seq, dtype=torch.float32), torch.tensor(y_seq, dtype=torch.long))
@@ -96,10 +81,12 @@ def train_on_subjects(subjects_to_load, models_output_dir='models'):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(lstm_model.parameters())
     
+    history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
+    
     print(f"\nAddestramento LSTM con PyTorch (Gap di {TRAIN_PREDICTION_GAP_MINUTES} min)...")
     for epoch in range(EPOCHS):
         lstm_model.train()
-        train_loss = 0.0
+        train_loss, train_correct, train_total = 0.0, 0, 0
         for sequences, labels in train_loader:
             optimizer.zero_grad()
             outputs = lstm_model(sequences)
@@ -107,29 +94,38 @@ def train_on_subjects(subjects_to_load, models_output_dir='models'):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
+            train_correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+            train_total += labels.size(0)
         
         lstm_model.eval()
-        val_loss, val_acc = 0.0, 0
+        val_loss, val_correct, val_total = 0.0, 0, 0
         with torch.no_grad():
             for sequences, labels in val_loader:
                 outputs = lstm_model(sequences)
                 val_loss += criterion(outputs, labels).item()
-                val_acc += ((torch.max(outputs.data, 1)[1]) == labels).sum().item()
+                val_correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+                val_total += labels.size(0)
         
         avg_train_loss = train_loss / len(train_loader)
+        avg_train_acc = train_correct / train_total
         avg_val_loss = val_loss / len(val_loader)
-        avg_val_acc = val_acc / len(val_dataset)
+        avg_val_acc = val_correct / val_total
         
-        print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Val Acc: {avg_val_acc:.4f}")
+        history['train_loss'].append(avg_train_loss)
+        history['train_acc'].append(avg_train_acc)
+        history['val_loss'].append(avg_val_loss)
+        history['val_acc'].append(avg_val_acc)
+        
+        print(f"Epoch {epoch+1}/{EPOCHS}, Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_acc:.4f}, Val Loss: {avg_val_loss:.4f}, Val Acc: {avg_val_acc:.4f}")
 
     os.makedirs(models_output_dir, exist_ok=True)
     torch.save(lstm_model.state_dict(), os.path.join(models_output_dir, 'loso_lstm_model.pth'))
     joblib.dump(rf_model, os.path.join(models_output_dir, 'loso_rf_model.pkl'))
     joblib.dump(scaler, os.path.join(models_output_dir, 'loso_scaler.pkl'))
     print(f"\nModelli per questo fold salvati in '{models_output_dir}'.")
+    
+    # Salva la cronologia e il grafico
+    utils.save_history(history, os.path.join(models_output_dir, 'training_history.json'))
+    utils.plot_history(history, os.path.join(models_output_dir, 'training_history.pdf'))
 
-if __name__ == '__main__':
-    # Esempio: addestra un modello sui primi 5 soggetti
-    print("Questo script è pensato per essere importato, non eseguito direttamente.")
-    print("Per un esempio di esecuzione, addestrando sui soggetti da 0 a 4...")
-    train_on_subjects(subjects_to_load=list(range(5)), models_output_dir='models/example_run')
+    return history

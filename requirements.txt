@@ -3,3 +3,6 @@ scikit-learn
 mne
 numpy
 joblib
+pandas
+matplotlib
+seaborn
