@@ -29,8 +29,12 @@ LOOK_BACK = 10  # Numero di epoche passate da considerare
 
 # Parametri per l'addestramento
 BATCH_SIZE = 32
-EPOCHS = 50
+EPOCHS = 50 # NOTA: Per un esperimento LOSO completo, potresti voler ridurre questo valore (es. 15-20) per velocizzare.
 VALIDATION_SPLIT = 0.2
+TRAIN_PREDICTION_GAP_MINUTES = 30 # Gap usato durante l'addestramento del modello
+
+# NUOVO: Gap di previsione da valutare durante il test (in minuti)
+EVALUATION_GAPS_MINUTES = [30, 60, 90, 120]
 
 # Elettrodi da utilizzare
 EEG_CHANNELS = ['EEG Fpz-Cz', 'EEG Pz-Oz']

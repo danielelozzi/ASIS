@@ -19,19 +19,28 @@ from config import (
     EPOCHS, 
     VALIDATION_SPLIT, 
     LSTM_UNITS,
-    LSTM_DROPOUT
+    LSTM_DROPOUT,
+    TRAIN_PREDICTION_GAP_MINUTES,
+    EPOCH_DURATION
 )
 
-def prepare_sequences(features, labels, look_back, gap):
+def prepare_sequences(features, labels, look_back, gap_epochs):
+    """ Prepara sequenze per l'LSTM. """
     X, y = [], []
-    for i in range(len(features) - look_back - gap):
+    # Assicurati di non andare fuori dai limiti dell'array
+    for i in range(len(features) - look_back - gap_epochs):
         X.append(features[i:i + look_back])
-        y.append(labels[i + look_back + gap])
+        y.append(labels[i + look_back + gap_epochs])
     return np.array(X), np.array(y)
 
-def train_general_model(subjects_to_load, models_output_dir='models'):
-    print("--- Inizio Addestramento Modello Generale (PyTorch) ---")
-    
+# MODIFICATA: La funzione ora accetta parametri per essere riutilizzabile
+def train_on_subjects(subjects_to_load, models_output_dir='models'):
+    """
+    Addestra i modelli sui soggetti specificati e li salva nella directory data.
+    """
+    print(f"--- Inizio Addestramento per {len(subjects_to_load)} soggetti ---")
+    print(f"--- I modelli verranno salvati in: {models_output_dir} ---")
+
     all_files = data_loader.fetch_physionet_subjects(subjects=subjects_to_load)
     if not all_files:
         print("\nERRORE: Nessun file di dati trovato.")
@@ -45,6 +54,10 @@ def train_general_model(subjects_to_load, models_output_dir='models'):
             all_features.append(features)
             all_labels.append(labels)
     
+    if not all_features:
+        print("\nERRORE: Nessuna feature estratta. Impossibile continuare.")
+        return
+
     X_features = np.concatenate(all_features)
     y_labels = np.concatenate(all_labels)
     
@@ -53,17 +66,18 @@ def train_general_model(subjects_to_load, models_output_dir='models'):
     
     print("\nAddestramento Random Forest...")
     rf_model = models.get_classical_classifier()
-    X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(
-        X_scaled, y_labels, test_size=0.2, random_state=42, stratify=y_labels
-    )
-    rf_model.fit(X_train_rf, y_train_rf)
-    print(f"Accuratezza Random Forest: {rf_model.score(X_test_rf, y_test_rf):.4f}")
+    # Non c'è bisogno di un test set qui, usiamo tutti i dati di training
+    rf_model.fit(X_scaled, y_labels)
+    print("Addestramento Random Forest completato.")
     
     print("\nPreparazione sequenze per LSTM...")
-    X_seq, y_seq = prepare_sequences(X_scaled, y_labels, LOOK_BACK, gap=1)
+    # Calcola il gap in numero di epoche
+    gap_epochs = int(TRAIN_PREDICTION_GAP_MINUTES * 60 / EPOCH_DURATION)
+    X_seq, y_seq = prepare_sequences(X_scaled, y_labels, LOOK_BACK, gap_epochs)
     
     n_features = X_seq.shape[2]
     num_classes = len(np.unique(y_labels))
+    
     lstm_model = models.create_lstm_model(
         input_size=n_features,
         hidden_size=LSTM_UNITS,
@@ -82,31 +96,40 @@ def train_general_model(subjects_to_load, models_output_dir='models'):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(lstm_model.parameters())
     
-    print("\nAddestramento LSTM con PyTorch...")
+    print(f"\nAddestramento LSTM con PyTorch (Gap di {TRAIN_PREDICTION_GAP_MINUTES} min)...")
     for epoch in range(EPOCHS):
         lstm_model.train()
+        train_loss = 0.0
         for sequences, labels in train_loader:
             optimizer.zero_grad()
             outputs = lstm_model(sequences)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+            train_loss += loss.item()
         
         lstm_model.eval()
-        val_loss, val_acc = 0.0, 0.0
+        val_loss, val_acc = 0.0, 0
         with torch.no_grad():
             for sequences, labels in val_loader:
                 outputs = lstm_model(sequences)
                 val_loss += criterion(outputs, labels).item()
                 val_acc += ((torch.max(outputs.data, 1)[1]) == labels).sum().item()
         
-        print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {val_loss/len(val_loader):.4f}, Val Acc: {val_acc/len(val_dataset):.4f}")
+        avg_train_loss = train_loss / len(train_loader)
+        avg_val_loss = val_loss / len(val_loader)
+        avg_val_acc = val_acc / len(val_dataset)
+        
+        print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Val Acc: {avg_val_acc:.4f}")
 
     os.makedirs(models_output_dir, exist_ok=True)
-    torch.save(lstm_model.state_dict(), os.path.join(models_output_dir, 'general_lstm_model.pth'))
-    joblib.dump(rf_model, os.path.join(models_output_dir, 'general_rf_model.pkl'))
-    joblib.dump(scaler, os.path.join(models_output_dir, 'general_scaler.pkl'))
-    print(f"\nModelli salvati in '{models_output_dir}'.")
+    torch.save(lstm_model.state_dict(), os.path.join(models_output_dir, 'loso_lstm_model.pth'))
+    joblib.dump(rf_model, os.path.join(models_output_dir, 'loso_rf_model.pkl'))
+    joblib.dump(scaler, os.path.join(models_output_dir, 'loso_scaler.pkl'))
+    print(f"\nModelli per questo fold salvati in '{models_output_dir}'.")
 
 if __name__ == '__main__':
-    train_general_model(subjects_to_load=list(range(83)))
+    # Esempio: addestra un modello sui primi 5 soggetti
+    print("Questo script è pensato per essere importato, non eseguito direttamente.")
+    print("Per un esempio di esecuzione, addestrando sui soggetti da 0 a 4...")
+    train_on_subjects(subjects_to_load=list(range(5)), models_output_dir='models/example_run')
