@@ -1,1 +1,7 @@
 .DS_Store
+__pycache__/data_loader.cpython-310.pyc
+__pycache__/config.cpython-310.pyc
+__pycache__/experiment_logic.cpython-310.pyc
+__pycache__/feature_extractor.cpython-310.pyc
+__pycache__/models.cpython-310.pyc
+__pycache__/utils.cpython-310.pyc
