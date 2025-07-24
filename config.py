@@ -8,6 +8,12 @@ BANDS = {
     'sigma': (12, 16), 'beta': (16, 30)
 }
 
+# Elettrodi
+EEG_CHANNELS = ['EEG Fpz-Cz', 'EEG Pz-Oz'] # <-- Questa riga DEVE esserci
+
+# Directory di output
+OUTPUTS_DIR = 'outputs_subject_specific' # Nuova directory per distinguere i risultati
+
 # Mappatura etichette
 LABEL_MAP = {
     'Sleep stage W': 0, 'Sleep stage 1': 1, 'Sleep stage 2': 2,
