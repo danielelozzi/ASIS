@@ -12,7 +12,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import models
 from config import (
     LOOK_BACK, BATCH_SIZE, EPOCHS, VALIDATION_SPLIT, LSTM_UNITS,
-    LSTM_DROPOUT, PREDICTION_TARGET_GAP_MINUTES, EPOCH_DURATION, UNIQUE_CLASS_NAMES
+    LSTM_DROPOUT, PREDICTION_TARGET_GAP_MINUTES, EPOCH_DURATION, UNIQUE_CLASS_NAMES,
+    LABEL_MAP
 )
 
 def prepare_sequences(features, labels, look_back, gap_epochs):
@@ -37,10 +38,12 @@ def train_and_evaluate_rf(train_features, train_labels, test_features, test_labe
     accuracy = accuracy_score(test_labels, predictions)
     
     # Genera il report di classificazione
+    all_possible_labels = sorted(list(set(LABEL_MAP.values())))
     report = classification_report(
         test_labels, 
         predictions, 
         target_names=UNIQUE_CLASS_NAMES,
+        labels=all_possible_labels,
         zero_division=0
     )
     
