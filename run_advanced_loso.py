@@ -1,20 +1,23 @@
 # run_advanced_loso.py
-
 import os
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import joblib # Per salvare lo scaler
 
 import data_loader
 import feature_extractor
-import experiment_logic
+import experiment_logic # per prepare_sequences
 import models
 import utils
 from config import (
     OUTPUTS_DIR, UNIQUE_CLASS_NAMES, EPOCH_DURATION, LOOK_BACK,
-    TRAINING_WINDOW_HOURS_PER_SUBJECT, PREDICTION_INCREMENT_MINUTES,
+    TRAIN_SUBJECT_RATIO, RANDOM_SEED, PREDICTION_TARGET_TIMES_MINUTES,
     LSTM_UNITS, LSTM_DROPOUT, LABEL_MAP, FS,
-    BATCH_SIZE, EPOCHS, VALIDATION_SPLIT # Importa anche questi da config
+    BATCH_SIZE, EPOCHS, VALIDATION_SPLIT, LSTM_TRAIN_PREDICTION_GAP_MINUTES,
+    MLP_HIDDEN_SIZE, MLP_DROPOUT
 )
 
 def run_experiment(all_subject_ids):
