@@ -9,7 +9,7 @@
   Questo lavoro è un'implementazione pratica e una continuazione dei concetti presentati nel seguente articolo di ricerca, adattato per esplorare la predizione temporale con feature esplicite:
   > Lozzi, D., Di Matteo, A., Mattei, E., Cipriani, A., Caianiello, P., Mignosi, F., & Placidi, G. (2024, October). ASIS: A Smart Alarm Clock Based on Deep Learning for the Safety of Night Workers. In *2024 IEEE International Conference on Metrology for eXtended Reality, Artificial Intelligence and Neural Engineering (MetroXRAINE)* (pp. 1129--1134). IEEE.
 
-##  Citazione BibTeX
+#  Citazione BibTeX
  ```bibtex
  @inproceedings{lozzi2024asis,
    title={ASIS: A Smart Alarm Clock Based on Deep Learning for the Safety of Night Workers},
